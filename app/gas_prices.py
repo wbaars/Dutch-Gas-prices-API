@@ -10,6 +10,7 @@ from PIL import Image
 import requests
 import pytesseract
 from fake_headers import Headers
+import cv2
 
 # Settings
 # Something like lru_cache would be nice but has no time expiring support, so custom json storage
@@ -47,7 +48,6 @@ def gas_prices(station_id):
                     pass
         except Exception as exception_info:
             print(f'_search_value failed: {exception_info}')
-                
         return return_value
 
 
@@ -61,7 +61,11 @@ def gas_prices(station_id):
         if response.status_code == 200:
             img = Image.open(BytesIO(response.content))
             img.save(f'cache/{station_id}.png')
-            ocr_result = pytesseract.image_to_string(img)
+            img2 = cv2.imread(f'cache/{station_id}.png')
+            img2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY) #make grayscale
+            img2 = cv2.resize(img2, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC) #resize image 2x
+            cv2.imwrite(f'cache/{station_id}_enhanced.png', img2) #save enhanced image
+            ocr_result = pytesseract.image_to_string(img2)
             ocr_lines = ocr_result.split("\n")
 
             benzine_prijs = _search_value(ocr_lines, 'Euro 95')
@@ -72,7 +76,8 @@ def gas_prices(station_id):
                     'station_id': station_id,
                     'benzine_prijs': benzine_prijs,
                     'diesel_prijs' : diesel_prijs,
-                    'ocr_station' : ocr_lines[0],
+                    'station_name' : ocr_lines[0],
+                    'station_location' : ocr_lines[1],
                     'status' : 'Station exists?'
                     }
             else:
@@ -80,7 +85,8 @@ def gas_prices(station_id):
                     'station_id': station_id,
                     'benzine_prijs': benzine_prijs,
                     'diesel_prijs' : diesel_prijs,
-                    'ocr_station' : ocr_lines[0],
+                    'station_name' : ocr_lines[0],
+                    'station_location' : ocr_lines[1],
                     'status' : 'Ok'
                     }
 
@@ -97,6 +103,8 @@ def gas_prices(station_id):
                 'benzine_prijs': None,
                 'diesel_prijs' : None,
                 'ocr_station' : None,
+                'station_name' : None,
+                'station_location' : None,
                 'status' : f'{response.status_code}'
                 }
         return data
